@@ -31,3 +31,15 @@ pub fn simple_two_tone(img: &DynamicImage) -> Option<GrayImage> {
         }
     }))
 }
+
+pub fn lax_two_tone(img: &DynamicImage) -> Option<GrayImage> {
+    let img = img.clone().into_rgb8();
+
+    Some(GrayImage::from_fn(img.width(), img.height(), |x, y| {
+        if img.get_pixel(x, y).to_luma().0[0] > 128 {
+            Luma([255])
+        } else {
+            Luma([0])
+        }
+    }))
+}
