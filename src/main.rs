@@ -61,10 +61,12 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
     let algo = quantize::lax_two_tone;
     match image::guess_format(&std::fs::read(&img_path).expect("cannot read")).expect("cannot guess string") {
         ImageFormat::Gif => {
+
             let gif_reader = BufReader::new(File::open(&img_path).expect("Cannot open file"));
             let gif_dec = GifDecoder::new(gif_reader).expect("Cannot create gif decoder");
 
             let mut gif_enc = GifEncoder::new(cursor);
+            gif_enc.set_repeat(image::codecs::gif::Repeat::Infinite).expect("cannot set infinite");
 
             for frame in gif_dec.into_frames() {
                 let frame = frame.expect("cannot into_frames");
