@@ -6,7 +6,7 @@ use image::{DynamicImage, GrayAlphaImage, GrayImage, ImageReader, Pixel, RgbImag
 
 // Always returns either (0,0,0,0) pixels or (255, 255, 255, 255)
 
-pub fn simple_two_tone(img: &DynamicImage) -> Option<GrayImage> {
+pub fn strict_two_tone(img: &DynamicImage) -> Option<GrayImage> {
     let img = img.clone().into_rgb8();
     let mut colors = HashSet::new();
     // let ret = RgbImage::new(img.width(), img.height());
@@ -32,7 +32,7 @@ pub fn simple_two_tone(img: &DynamicImage) -> Option<GrayImage> {
     }))
 }
 
-pub fn lax_two_tone(img: &DynamicImage) -> Option<GrayImage> {
+pub fn luma_threshold_128(img: &DynamicImage) -> Option<GrayImage> {
     let img = img.clone().into_rgb8();
 
     Some(GrayImage::from_fn(img.width(), img.height(), |x, y| {

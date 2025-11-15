@@ -3,18 +3,23 @@ mod quantize;
 #[macro_use] extern crate rocket;
 
 use image::codecs::gif::{GifDecoder, GifEncoder};
-use image::{AnimationDecoder, DynamicImage, EncodableLayout, ImageEncoder, ImageFormat, ImageReader, RgbaImage};
-use quantize::simple_two_tone;
+use image::{AnimationDecoder, DynamicImage, EncodableLayout, ImageEncoder, ImageFormat, ImageReader, RgbaImage, GrayImage};
 // use rocket::futures::io::BufReader;
 use rocket::http::{ContentType, Status};
 use rocket::{response, Build, Response, Rocket};
 use rocket::fs::{FileServer, relative};
 use rocket_dyn_templates::{Template, context};
 use std::arch::x86_64::_mm_cmpunord_sd;
+use std::collections::HashMap;
 use std::fs::read_to_string;
-use std::{io::{Cursor, BufReader}, fs, fs::File, path::PathBuf, any::Any};
+use std::{io::{Cursor, BufReader}, fs, fs::File, path::PathBuf, any::Any, option::Option};
 // use log::{info, debug};
 use anyhow::Result;
+
+const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 1] = [
+    ("lt128", quantize::luma_threshold_128), 
+];
+
 
 #[get("/hello/<name>/<age>")]
 fn hello(name: &str, age: u8) -> String {
@@ -31,8 +36,10 @@ fn index() -> Template {
     // rocket::build().mount("/", routes![hello2])
     let img_paths = get_img_paths("imgs").expect("error getting img paths");
 
+    let algo_names = ALGOS.map(|x| x.0);
     // format!("Hello, {} year old named {}!", "yoo", 342)
-    Template::render("index", context! {img_paths: img_paths})
+    Template::render("index", context! {img_paths: img_paths,
+                                        algo_names: algo_names,})
 }
 
 
@@ -58,7 +65,14 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
 
     let mut out = Vec::new();
     let mut cursor = Cursor::new(&mut out);
-    let algo = quantize::lax_two_tone;
+
+    let algo_match : Vec<_> = ALGOS.into_iter().filter(|x| x.0 == algo_name).collect();
+    if algo_match.len() != 1 {
+        return None
+    }
+    let algo = algo_match[0].1;
+
+    // let algo = quantize::lax_two_tone;
     match image::guess_format(&std::fs::read(&img_path).expect("cannot read")).expect("cannot guess string") {
         ImageFormat::Gif => {
 
