@@ -36,7 +36,19 @@ pub fn luma_threshold_128(img: &DynamicImage) -> Option<GrayImage> {
     let img = img.clone().into_rgb8();
 
     Some(GrayImage::from_fn(img.width(), img.height(), |x, y| {
-        if img.get_pixel(x, y).to_luma().0[0] > 128 {
+        if img.get_pixel(x, y).to_luma().0[0] >= 128 {
+            Luma([255])
+        } else {
+            Luma([0])
+        }
+    }))
+}
+
+pub fn luma_threshold_128_inverted(img: &DynamicImage) -> Option<GrayImage> {
+    let img = img.clone().into_rgb8();
+
+    Some(GrayImage::from_fn(img.width(), img.height(), |x, y| {
+        if img.get_pixel(x, y).to_luma().0[0] < 128 {
             Luma([255])
         } else {
             Luma([0])

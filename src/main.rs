@@ -16,8 +16,9 @@ use std::{io::{Cursor, BufReader}, fs, fs::File, path::PathBuf, any::Any, option
 // use log::{info, debug};
 use anyhow::Result;
 
-const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 1] = [
+const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 2] = [
     ("lt128", quantize::luma_threshold_128), 
+    ("lt128i", quantize::luma_threshold_128_inverted), 
 ];
 
 
