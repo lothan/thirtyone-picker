@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title> 88x31 Picker </title>
+    </head>
+  <body>
+    <form method="post" action="submit_choices">
+<button type="submit">Save Choices</button>
+<table>
+{% for img in img_paths %}
+<tr>
+  <td> <img src="imgs/base/{{img}}" /> </td>
+  {% for algo in algo_names %}
+  <td>
+    <img src="conv/{{algo}}/{{img}}">
+    <input type="radio" id="{{algo}}" name="{{img}}"/ >
+           
+  </td>
+  {% endfor %}
+</tr>
+{% endfor %}
+</form>
+<table>
+</html>
