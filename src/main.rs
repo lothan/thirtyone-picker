@@ -7,29 +7,30 @@ use image::{AnimationDecoder, DynamicImage, EncodableLayout, ImageEncoder, Image
 // use rocket::futures::io::BufReader;
 use rocket::http::{ContentType, Status};
 use rocket::{response, Build, Response, Rocket};
+use rocket::form::{Form};
 use rocket::fs::{FileServer, relative};
 use rocket_dyn_templates::{Template, context};
-use std::arch::x86_64::_mm_cmpunord_sd;
 use std::collections::HashMap;
-use std::fs::read_to_string;
-use std::{io::{Cursor, BufReader}, fs, fs::File, path::PathBuf, any::Any, option::Option};
+use std::io::Write;
+use std::{io::{Cursor, BufReader}, fs, fs::File, option::Option};
 // use log::{info, debug};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 2] = [
     ("lt128", quantize::luma_threshold_128), 
     ("lt128i", quantize::luma_threshold_128_inverted), 
 ];
 
-
-#[get("/hello/<name>/<age>")]
-fn hello(name: &str, age: u8) -> String {
-    format!("Hello, {} year old named {}!", age, name)
+#[derive(FromForm, Serialize, Deserialize)]
+struct SubmitForm {
+    name: String,
 }
 
-#[get("/")]
-fn hello2() -> String {
-    format!("Hello, {} year old named {}!", 4321, "fdjsklf")
+#[derive(Serialize, Deserialize)]
+struct Choice {
+    name: String,
+    algo: String,
 }
 
 #[get("/")]
@@ -41,6 +42,19 @@ fn index() -> Template {
     // format!("Hello, {} year old named {}!", "yoo", 342)
     Template::render("index", context! {img_paths: img_paths,
                                         algo_names: algo_names,})
+}
+
+#[post("/submit_choices", data="<form>")]
+fn submit_choices(form: Form<HashMap<String, String>>) { // -> Template {
+    let submissions = form.into_inner();
+    let mut choices = vec![];
+    for submit in submissions {
+        choices.push(Choice { name: submit.0, algo: submit.1 });
+        
+    }
+
+    let mut f = File::create("output.json").unwrap();
+    f.write(serde_json::to_string_pretty(&choices).unwrap().as_bytes());
 }
 
 
@@ -127,7 +141,7 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, convert_img])
+    rocket::build().mount("/", routes![index, convert_img, submit_choices])
         .mount("/imgs/base", FileServer::from(relative!("imgs")))
         .attach(Template::fairing())
 }

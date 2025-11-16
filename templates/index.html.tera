@@ -13,7 +13,7 @@
   {% for algo in algo_names %}
   <td>
     <img src="conv/{{algo}}/{{img}}">
-    <input type="radio" id="{{algo}}" name="{{img}}"/ >
+    <input type="radio" id="{{algo}}" name="{{img}}" value="{{algo}}"/>
            
   </td>
   {% endfor %}
