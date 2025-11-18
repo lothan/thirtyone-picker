@@ -3,19 +3,22 @@ mod quantize;
 #[macro_use] extern crate rocket;
 
 use image::codecs::gif::{GifDecoder, GifEncoder};
-use image::{AnimationDecoder, DynamicImage, EncodableLayout, ImageEncoder, ImageFormat, ImageReader, RgbaImage, GrayImage};
+use image::{AnimationDecoder, DynamicImage, EncodableLayout, ImageFormat, ImageReader, GrayImage};
 // use rocket::futures::io::BufReader;
-use rocket::http::{ContentType, Status};
-use rocket::{response, Build, Response, Rocket};
+// use rocket::http::{ContentType, Status};
+// use rocket::{response::Redirect, Build, Response, Rocket};
+use rocket::{response::Redirect};
 use rocket::form::{Form};
 use rocket::fs::{FileServer, relative};
 use rocket_dyn_templates::{Template, context};
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::{io::{Cursor, BufReader}, fs, fs::File, option::Option};
 // use log::{info, debug};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+
+const CHOICE_SAVE_PATH : &str = "choices.json";
 
 const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 2] = [
     ("lt128", quantize::luma_threshold_128), 
@@ -36,25 +39,27 @@ struct Choice {
 #[get("/")]
 fn index() -> Template {
     // rocket::build().mount("/", routes![hello2])
+    let choices_json : String = fs::read_to_string(CHOICE_SAVE_PATH).unwrap_or(String::from("[]"));
+    let choices : Vec<Choice> = serde_json::from_str(&choices_json).expect("error deserializing choices");
     let img_paths = get_img_paths("imgs").expect("error getting img paths");
 
     let algo_names = ALGOS.map(|x| x.0);
     // format!("Hello, {} year old named {}!", "yoo", 342)
     Template::render("index", context! {img_paths: img_paths,
-                                        algo_names: algo_names,})
+                                        algo_names: algo_names,
+                                        choices: choices,
+    })
 }
 
 #[post("/submit_choices", data="<form>")]
-fn submit_choices(form: Form<HashMap<String, String>>) { // -> Template {
+fn submit_choices(form: Form<HashMap<String, String>>) -> Redirect {
     let submissions = form.into_inner();
-    let mut choices = vec![];
-    for submit in submissions {
-        choices.push(Choice { name: submit.0, algo: submit.1 });
-        
-    }
+    let mut f = File::create(CHOICE_SAVE_PATH).unwrap();
 
-    let mut f = File::create("output.json").unwrap();
+    let choices : Vec<(&str, &str)> = submissions.iter().map(|(_, val)| val.split_once(":").unwrap()).collect();
+
     f.write(serde_json::to_string_pretty(&choices).unwrap().as_bytes());
+    Redirect::to("/")
 }
 
 

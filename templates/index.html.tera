@@ -9,12 +9,18 @@
 <table>
 {% for img in img_paths %}
 <tr>
+  {% set idx = loop.index0 %}
   <td> <img src="imgs/base/{{img}}" /> </td>
   {% for algo in algo_names %}
   <td>
     <img src="conv/{{algo}}/{{img}}">
-    <input type="radio" id="{{algo}}" name="{{img}}" value="{{algo}}"/>
-           
+    <input type="radio" name="{{idx}}" value="{{img}}:{{algo}}"
+           {% for choice in choices %}
+           {% if choice.name == img and choice.algo == algo %}
+           checked
+           {% endif %}
+           {% endfor %}
+           >
   </td>
   {% endfor %}
 </tr>
