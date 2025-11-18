@@ -3,7 +3,8 @@ mod quantize;
 #[macro_use] extern crate rocket;
 
 use image::codecs::gif::{GifDecoder, GifEncoder};
-use image::{AnimationDecoder, DynamicImage, EncodableLayout, ImageFormat, ImageReader, GrayImage};
+use image::{AnimationDecoder, DynamicImage, GrayImage, ImageFormat, ImageReader, Luma, Pixel};
+use rocket::form::validate::range;
 // use rocket::futures::io::BufReader;
 // use rocket::http::{ContentType, Status};
 // use rocket::{response::Redirect, Build, Response, Rocket};
@@ -12,13 +13,19 @@ use rocket::form::{Form};
 use rocket::fs::{FileServer, relative};
 use rocket_dyn_templates::{Template, context};
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::{Write};
+use std::path::Path;
+use std::sync::Arc;
 use std::{io::{Cursor, BufReader}, fs, fs::File, option::Option};
 // use log::{info, debug};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 const CHOICE_SAVE_PATH : &str = "choices.json";
+const INPUT_IMG_DIR : &str = "imgs/";
+// const OUTPUT_IMG_DIR : &str = "out/";
+const OUTPUT_STILLS_DIR : &str = "stills/";
+const OUTPUT_GIFS_DIR : &str = "gifs/";
 
 const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 2] = [
     ("lt128", quantize::luma_threshold_128), 
@@ -41,7 +48,7 @@ fn index() -> Template {
     // rocket::build().mount("/", routes![hello2])
     let choices_json : String = fs::read_to_string(CHOICE_SAVE_PATH).unwrap_or(String::from("[]"));
     let choices : Vec<Choice> = serde_json::from_str(&choices_json).expect("error deserializing choices");
-    let img_paths = get_img_paths("imgs").expect("error getting img paths");
+    let img_paths = get_img_paths(INPUT_IMG_DIR).expect("error getting img paths");
 
     let algo_names = ALGOS.map(|x| x.0);
     // format!("Hello, {} year old named {}!", "yoo", 342)
@@ -49,6 +56,66 @@ fn index() -> Template {
                                         algo_names: algo_names,
                                         choices: choices,
     })
+}
+
+fn still_to_rrframe(img: GrayImage ) -> Vec<u8> {
+    let mut ret = vec![];
+    if img.width() != 88 && img.height() != 31 {
+        panic!("still_to_rrframe: Incorrect dimensions!");
+    }
+    let mut cur_byte = 0;
+    for y in 0..38 {
+        for x in 0..96 {
+            let bit = if y < 3 || y >= 34 || x < 4 || x >= 92 ||
+                *img.get_pixel(x-4, y-3) == Luma([0]) { 0 } else { 1 };
+            cur_byte |= bit << 7 - (x % 8);
+            if x % 8 == 7 {
+                ret.push(cur_byte);
+                cur_byte = 0;
+            }
+        }
+    }
+
+    ret 
+}
+
+fn to_rrimg(input: Vec<u8>) -> Option<Vec<u8>> {
+    let mut ret = vec![];
+
+    let mut total_frames = 0;
+    
+    let cursor = Cursor::new(&input);
+    match image::guess_format(&input).expect("cannot guess converted_data") {
+        ImageFormat::Gif => {
+            let gif_dec = GifDecoder::new(cursor).unwrap();
+            for frame in gif_dec.into_frames() {
+                let frame = frame.unwrap();
+                let delay = frame.delay();
+                let grayimg = DynamicImage::from(frame.into_buffer()).into_luma8();
+                let mut rrframe = still_to_rrframe(grayimg);
+
+                // rapidriter is 10fps and 1000 frames
+                // https://github.com/gregsadetsky/rapidriteros/blob/main/renderers/wasm/src/main.rs#L63
+                // so number of frames per frame is 100*ms
+                let (num, denom) = delay.numer_denom_ms();
+                let num_frames = (num * 100) / denom;
+                total_frames += num_frames;
+                if total_frames > 10000000 {
+                    return None
+                }
+                for _ in 0..num_frames {
+                    ret.append(&mut rrframe);
+                }
+            }
+        },
+        ImageFormat::Png => {
+            let img = ImageReader::with_format(cursor, ImageFormat::Png).decode().unwrap();
+            ret = still_to_rrframe(img.to_luma8());
+        },
+        _ => { return None }
+    }
+
+    Some(ret)
 }
 
 #[post("/submit_choices", data="<form>")]
@@ -59,6 +126,36 @@ fn submit_choices(form: Form<HashMap<String, String>>) -> Redirect {
     let choices : Vec<(&str, &str)> = submissions.iter().map(|(_, val)| val.split_once(":").unwrap()).collect();
 
     f.write(serde_json::to_string_pretty(&choices).unwrap().as_bytes());
+
+    fs::remove_dir_all(OUTPUT_STILLS_DIR);
+    fs::create_dir(OUTPUT_STILLS_DIR);
+    fs::remove_dir_all(OUTPUT_GIFS_DIR);
+    fs::create_dir(OUTPUT_GIFS_DIR);
+    for (img_fname, algo_name) in choices {
+        // read in image from img path as image
+        // let in_img_path = Path::new(INPUT_IMG_DIR).join(img_fname);
+        // let img = image::open(in_img_path).expect("cannot open image");
+        // pass it correct algo
+        
+        // let algo = ALGOS.iter().find(|(aname, _)| *aname == algo_name).expect("Cannot find algo").1;
+        // let converted = algo(&img).unwrap();
+        
+        let converted = convert_img(algo_name, img_fname).expect("Cannot convert image");
+
+        // convert visible output image into an rrimg (maybe 
+        if let Some(rrimg_data) = to_rrimg(converted) { 
+        // let rrimg_data = to_rrimg(converted);
+            let out_img_path = if rrimg_data.len() == 456 {
+                OUTPUT_STILLS_DIR.to_string() + img_fname + "." + algo_name + ".rrimg"
+            } else {
+                OUTPUT_GIFS_DIR.to_string() + img_fname + "." + algo_name + ".rrimg"
+            };
+            
+            let mut outfile = File::create(out_img_path).expect("Cannot create outfile");
+            outfile.write(&rrimg_data);
+        };
+    };
+    
     Redirect::to("/")
 }
 
@@ -80,8 +177,8 @@ fn get_img_paths(dir: &str) -> Result<Vec<String>> {
 
 #[get("/conv/<algo_name>/<img_fname>")]
 fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
-
-    let img_path = format!("imgs/{}", img_fname);
+    // let img_path = format!("{}", img_fname);
+    let img_path = INPUT_IMG_DIR.to_string() + img_fname;
 
     let mut out = Vec::new();
     let mut cursor = Cursor::new(&mut out);
@@ -138,7 +235,6 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
         },
         _ => None
     }
-
     // let img_dec : GifDecoder<R> = ImageReader::open(format!("imgs/{}", img_path)).unwrap().into_decoder().unwrap();
 
 }
@@ -147,6 +243,6 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
 #[launch]
 fn rocket() -> _ {
     rocket::build().mount("/", routes![index, convert_img, submit_choices])
-        .mount("/imgs/base", FileServer::from(relative!("imgs")))
+        .mount("/imgs/base", FileServer::from(Path::new(INPUT_IMG_DIR).canonicalize().unwrap()))
         .attach(Template::fairing())
 }
