@@ -1,8 +1,13 @@
 use std::path::PathBuf;
 use std::collections::HashSet;
 
-use image::{DynamicImage, GrayAlphaImage, GrayImage, ImageReader, Pixel, RgbImage, RgbaImage, Luma};
+use image::{DynamicImage, GrayImage, Pixel, Luma};
 
+
+
+// SVM
+// (2) K means clustering
+// do the luma based on the median 
 
 // Always returns either (0,0,0,0) pixels or (255, 255, 255, 255)
 
