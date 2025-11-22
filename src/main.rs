@@ -27,9 +27,13 @@ const INPUT_IMG_DIR : &str = "imgs/";
 const OUTPUT_STILLS_DIR : &str = "stills/";
 const OUTPUT_GIFS_DIR : &str = "gifs/";
 
-const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 2] = [
+const ALGOS : [(&str, fn(&DynamicImage) -> Option<GrayImage>); 6] = [
     ("lt128", quantize::luma_threshold_128), 
-    ("lt128i", quantize::luma_threshold_128_inverted), 
+    ("ltm", quantize::luma_threshold_mean), 
+    ("rtm", quantize::red_threshold_mean), 
+    ("dm2", quantize::dither_m2_threshold), 
+    ("dm4", quantize::dither_m4_threshold), 
+    ("dm8", quantize::dither_m8_threshold),
 ];
 
 // TODO: specify preambles and deletes with checkboxes
