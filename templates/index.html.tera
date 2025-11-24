@@ -15,6 +15,10 @@
 <tr>
   {% set idx = loop.index0 %}
   <td> <img src="imgs/base/{{img}}" /> </td>
+  <td>
+      <input type="radio" name="{{idx}}" value="{{img}}:delete">Delete</input> </td>
+  </form>
+  </td>
   {% for algo in algo_names %}
   <td>
     <img src="conv/{{algo}}/{{img}}">

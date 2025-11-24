@@ -140,10 +140,20 @@ fn to_rrimg(input: Vec<u8>) -> Option<Vec<u8>> {
 #[post("/submit_choices", data="<form>")]
 fn submit_choices(form: Form<HashMap<String, String>>) -> Redirect {
     let submissions = form.into_inner();
+
+    let mut choices : Vec<(&str, &str)> = submissions.iter().map(|(_, val)| val.split_once(":").unwrap()).collect();
+
+    choices.retain(|(key, val)| {
+        if *val == "delete" {
+            let path = format!("{}/{}", INPUT_IMG_DIR, key);
+            fs::remove_file(path);
+            false
+        } else {
+            true
+        }
+    });
+
     let mut f = File::create(CHOICE_SAVE_PATH).unwrap();
-
-    let choices : Vec<(&str, &str)> = submissions.iter().map(|(_, val)| val.split_once(":").unwrap()).collect();
-
     f.write(serde_json::to_string_pretty(&choices).unwrap().as_bytes());
 
     fs::remove_dir_all(OUTPUT_STILLS_DIR);
@@ -169,17 +179,29 @@ fn submit_choices(form: Form<HashMap<String, String>>) -> Redirect {
 
 #[post("/upload_image", data="<file>")]
 async fn upload_image(mut file: Form<TempFile<'_>> ) -> String {
-    let name = file.name().unwrap().to_string();
+    let name = file.raw_name().unwrap().as_str().unwrap().to_string();
 
     let path = format!("{}/{}", INPUT_IMG_DIR, name);
     file.move_copy_to(&path).await.unwrap();
 
     format!("File '{}' uploaded successfully!", name)
-        // match (&mut file).move_copy_to(&path).await { 
-        //     Ok(_) => return format!("File '{}' uploaded!", name),
-        //     Err(_) => return format!("Error moving file '{}' to path '{}'", name, &path),
-        // }
-        // return format!("File not named")
+}
+
+#[post("/delete_image", data="<form>")]
+async fn delete_image(form : Form<HashMap<String, String>> ) -> String {
+
+    let mut ret : String = "".to_string();
+    for item in form.iter() {
+        ret += &(item.0.as_str().to_owned() + ": " + item.1 + "\n");
+    }
+
+    // let name = file.name().unwrap().to_string();
+
+    // let path = format!("{}/{}", INPUT_IMG_DIR, name);
+    // file.move_copy_to(&path).await.unwrap();
+
+    // format!("File '{}' uploaded successfully!", name)
+    ret.to_string()
 }
 
 fn get_img_paths(dir: &str) -> Result<Vec<String>> {
@@ -199,7 +221,6 @@ fn get_img_paths(dir: &str) -> Result<Vec<String>> {
 
 #[get("/conv/<algo_name>/<img_fname>")]
 fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
-    // let img_path = format!("{}", img_fname);
     let img_path = INPUT_IMG_DIR.to_string() + img_fname;
 
     let mut out = Vec::new();
@@ -211,7 +232,6 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
     }
     let algo = algo_match[0].1;
 
-    // let algo = quantize::lax_two_tone;
     match image::guess_format(&std::fs::read(&img_path).expect("cannot read")).expect("cannot guess string") {
         ImageFormat::Gif => {
 
@@ -234,15 +254,8 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
                 }
             }
 
-            drop(gif_enc);  // Drop encoder to release the borrow of `out`
+            drop(gif_enc); 
             return Some(out)
-            // match quantize::simple_two_tone(&img) {
-            //     None => None, //Response::build().status(Status::NoContent).finalize(),
-            //     Some(quantized) => {
-            //         quantized.write_to(&mut cursor, image::ImageFormat::Png).expect("Cannot write");
-            //         Some(out)
-            //     }
-            // }
 
         },
         ImageFormat::Png => {
@@ -257,10 +270,7 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
         },
         _ => None
     }
-    // let img_dec : GifDecoder<R> = ImageReader::open(format!("imgs/{}", img_path)).unwrap().into_decoder().unwrap();
-
 }
-
 
 #[launch]
 fn rocket() -> _ {
