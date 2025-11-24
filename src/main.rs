@@ -5,12 +5,11 @@ mod quantize;
 use image::codecs::gif::{GifDecoder, GifEncoder};
 use image::{AnimationDecoder, DynamicImage, GrayImage, ImageFormat, ImageReader, Luma, Pixel};
 use rocket::form::validate::range;
-// use rocket::futures::io::BufReader;
-// use rocket::http::{ContentType, Status};
-// use rocket::{response::Redirect, Build, Response, Rocket};
+use rocket::futures::TryFutureExt;
+use rocket::response::content::RawJavaScript;
 use rocket::{response::Redirect};
 use rocket::form::{Form};
-use rocket::fs::{FileServer, relative};
+use rocket::fs::{relative, FileServer, NamedFile, TempFile};
 use rocket_dyn_templates::{Template, context};
 use std::collections::HashMap;
 use std::io::{Write};
@@ -168,6 +167,20 @@ fn submit_choices(form: Form<HashMap<String, String>>) -> Redirect {
     Redirect::to("/")
 }
 
+#[post("/upload_image", data="<file>")]
+async fn upload_image(mut file: Form<TempFile<'_>> ) -> String {
+    let name = file.name().unwrap().to_string();
+
+    let path = format!("{}/{}", INPUT_IMG_DIR, name);
+    file.move_copy_to(&path).await.unwrap();
+
+    format!("File '{}' uploaded successfully!", name)
+        // match (&mut file).move_copy_to(&path).await { 
+        //     Ok(_) => return format!("File '{}' uploaded!", name),
+        //     Err(_) => return format!("Error moving file '{}' to path '{}'", name, &path),
+        // }
+        // return format!("File not named")
+}
 
 fn get_img_paths(dir: &str) -> Result<Vec<String>> {
     let mut paths = Vec::new();
@@ -251,7 +264,7 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, convert_img, submit_choices])
+    rocket::build().mount("/", routes![index, convert_img, submit_choices, upload_image])
         .mount("/imgs/base", FileServer::from(Path::new(INPUT_IMG_DIR).canonicalize().unwrap()))
         .attach(Template::fairing())
 }

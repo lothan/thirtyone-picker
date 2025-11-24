@@ -4,6 +4,10 @@
     <title> 88x31 Picker </title>
     </head>
   <body>
+    <form method="post" action="/upload_image" enctype="multipart/form-data">
+      <input type="file" name="file" required>
+      <button type="submit">Upload 88x31</button>
+      </form>
     <form method="post" action="submit_choices">
 <button type="submit">Submit Choices</button>
 <table>
