@@ -2,37 +2,43 @@
 <html>
   <head>
     <title> 88x31 Picker </title>
-    </head>
+  </head>
   <body>
     <form method="post" action="/upload_image" enctype="multipart/form-data">
       <input type="file" name="file" required>
       <button type="submit">Upload 88x31</button>
-      </form>
+    </form>
+    <br>
     <form method="post" action="submit_choices">
-<button type="submit">Submit Choices</button>
-<table>
-{% for img in img_paths %}
-<tr>
-  {% set idx = loop.index0 %}
-  <td> <img src="imgs/base/{{img}}" /> </td>
-  <td>
-      <input type="radio" name="{{idx}}" value="{{img}}:delete">Delete</input> </td>
-  </form>
-  </td>
-  {% for algo in algo_names %}
-  <td>
-    <img src="conv/{{algo}}/{{img}}">
-    <input type="radio" name="{{idx}}" value="{{img}}:{{algo}}"
-           {% for choice in choices %}
-           {% if choice.name == img and choice.algo == algo %}
-           checked
-           {% endif %}
-           {% endfor %}
-           >
-  </td>
-  {% endfor %}
-</tr>
-{% endfor %}
-</form>
-<table>
+      <table>
+        <tr>
+          <td> orig </td>
+          <td> delete </td>
+          {% for algo in algo_names %}
+          <td> {{algo}} </td>
+          {% endfor %}
+        </tr>
+        {% for img in img_paths %}
+        <tr>
+          {% set idx = loop.index0 %}
+          <td> <img src="imgs/base/{{img}}" /> </td>
+          <td>
+            <input type="radio" name="{{idx}}" value="{{img}}:delete">Delete</input>
+          </td>
+          {% for algo in algo_names %}
+          <td>
+            <img src="conv/{{algo}}/{{img}}">
+            <input type="radio" name="{{idx}}" value="{{img}}:{{algo}}"
+                   {% for choice in choices %}
+                   {% if choice.name == img and choice.algo == algo %}
+                   checked
+                   {% endif %}
+                   {% endfor %} >
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        <button type="submit">Submit Choices</button>
+    </form>
+    </table>
 </html>
