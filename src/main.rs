@@ -274,7 +274,13 @@ fn convert_img(algo_name: &str, img_fname: &str) -> Option<Vec<u8>> {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, convert_img, submit_choices, upload_image])
+    rocket::build()
+        .configure(rocket::Config {
+            address: "0.0.0.0".parse().unwrap(),
+            port: 8000,
+            ..rocket::Config::default()
+        })
+        .mount("/", routes![index, convert_img, submit_choices, upload_image])
         .mount("/imgs/base", FileServer::from(Path::new(INPUT_IMG_DIR).canonicalize().unwrap()))
         .attach(Template::fairing())
 }
